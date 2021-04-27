@@ -1,0 +1,402 @@
+---
+title: "Project Code - Analysis of youth runaways in Allegheny County"
+author: "Aiswariya Raja"
+date: "9/22/2018"
+output: rmarkdown::github_document
+---
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+#Loading all required library packages
+library(MASS)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(GGally)
+library(scales)
+library(randomForest)
+```
+
+```{r}
+#Importing dataset into R
+setwd("~/allegheny-county-runaway-youth-analysis")
+cny <- read.csv("AnalyticExcercise_20180214.csv")
+```
+
+```{r}
+nrow(cny)
+```
+
+```{r}
+cny<- transform(cny,
+                RUNS = as.factor(mapvalues(RUNS,c(1,0),c("Runaway","Not Runaway"))),
+                SPELLONE = as.factor(mapvalues(SPELLONE,c(1,0),c("First Spell","Not First Spell"))),
+                INYEAR = as.factor(mapvalues(INYEAR, c(2014,2015,2016),c("2014","2015","2016"))),  
+                LEVELCHG = as.factor(mapvalues(LEVELCHG, c(0,1),c("0","1"))),
+                DISCH = as.factor(mapvalues(DISCH, c(0,1),c("0","1"))),
+                REENTER = as.factor(mapvalues(REENTER, c(0,1),c("0","1"))),
+                NPLACES = as.factor(mapvalues(NPLACES, c(1,2,3,4,5,6,7,8,9,11,13),c("1","2","3","4","5","6","7","8","9","11","13"))),
+                MOVES = as.factor(mapvalues(MOVES, c(0,1,2,3,4,5,6,7,8,10,12),c("0","1","2","3","4","5","6","7","8","10","12"))),
+                AGECAT7 = as.factor(mapvalues(AGECAT7, c(1,2,3,4,5,6,7,8), c("0 years","1-2 years","3-5 years", "6-8 years","9-11 years","12-14 years","15-17 years","18-23 years"))),
+                DURCAT = as.factor(mapvalues(DURCAT, c(1,2,3,4,5,6), c("1-29 days","30-89 days","90-179 days", "180-364 days","365-544 days","545-1094 days"))), 
+                TYPE = as.factor(mapvalues(TYPE, c("AL","FC","GH","IL","KC","RC", "RT","SF","SG","UK"), c("Alternative Placement","Foster Care","Group Home", "Independent Living","Kinship Care","Residential Care","Residential Treatment Facilities","Shelter Foster Care","Shelter Group Home","Unknown"))),
+                IM = as.factor(mapvalues(IM, c(1,2,3,4,5,6,7,8,9,10,11,12),c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"))),
+                IY = as.factor(mapvalues(IY,c(2014,2015,2016),c("2014","2015","2016"))),
+                OM = as.factor(mapvalues(OM, c(1,2,3,4,5,6,7,8,9,10,11,12),c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"))),
+                OY = as.factor(mapvalues(OY,c(2014,2015,2016,2017),c("2014","2015","2016","2017"))),
+                EXIT = as.factor(mapvalues(EXIT, c("XCA","XJP","XLC","XOP","XOT","XRF", "XRL","XRM","XRY","XUK","ZTC"), c("Completed adoption","Exit to JPO","Permanent Legal Custodianship", "Other Permanent Living Arrangement","Other","Reunification","Exit to relatives ","Reach majority","Runaway","Unknown","Still in care"))))
+```
+
+
+**INTRODUCTION**
+Data Demographics:
+```{r}
+#GENDER
+gender.prop.table <-round(prop.table(table(cny$GENDER)),2)
+gender.table<- table(cny$GENDER)
+gender.table
+round(prop.table(gender.table),2)
+barplot(gender.table, ylab = "Number of children", col="steelblue")
+```
+
+```{r}
+#HISPANIC
+hispanic.table <- table(cny$HISPANIC)
+hispanic.table
+round(prop.table(hispanic.table),2)
+barplot(hispanic.table, ylab = "Number of children", col="steelblue")
+
+#ETHNIC2
+ethnic2.table <- table(cny$ETHNIC2)
+ethnic2.table
+round(prop.table(ethnic2.table),2)
+barplot(ethnic2.table, ylab = "Number of children", col="steelblue")
+
+#AGE CATEGORY
+agecat.table <- table(cny$AGECAT7)
+agecat.table
+round(prop.table(agecat.table),2)
+barplot(agecat.table, ylab = "Number of children", col="steelblue")
+
+#SPELL AGE
+spellage.table <- table(cny$SPELLAGE)
+spellage.table
+round(prop.table(spellage.table),2)
+barplot(spellage.table, ylab = "Number of children", col="steelblue")
+
+#INYEAR
+inyear.table <- table(cny$INYEAR)
+inyear.table
+round(prop.table(inyear.table),2)
+barplot(inyear.table, ylab = "Number of children", col="steelblue")
+```
+
+
+```{r}
+type_freqtable <- sort(table(cny$TYPE))
+type_df <- as.data.frame(type_freqtable)
+round(prop.table(type_freqtable),2)
+colnames(type_df) <- c("Placement Type", "Number of Children")
+type_df
+ggplot(data = type_df, aes(x=`Placement Type`, y=`Number of Children`)) +geom_bar(stat="identity", fill="steelblue") + coord_flip() 
+```
+
+Distribution of children across
+```{r}
+exit_freqtable <- sort(table(cny$EXIT))
+exit_df <- as.data.frame(exit_freqtable)
+round(prop.table(exit_freqtable),2)
+colnames(exit_df) <- c("Exit Type", "Count")
+exit_df
+ggplot(data = exit_df, aes(x=`Exit Type`, y=Count)) + geom_bar(stat="identity", fill="steelblue") + coord_flip()
+```
+
+
+```{r}
+#AGE CATEGORY
+agecat.table <- table(cny$AGECAT7)
+agecat.table
+
+```
+
+
+
+**ANALYSIS**
+Research Question: What is the differentiating factor in this dataset between children who run away and those who do not. 
+
+**Part 1: Statistically Significant Predictors of runaways vs not runaways (T-tests)**
+
+1. Is Age a statisitcally significant predictor of runaway?
+```{r}
+#t-test to see if age is a significant predictor of children who runaway
+age.t.test <- t.test(AGE_20161231 ~ RUNS, data = cny)
+age.t.test
+age.xry.table <- table (cny$AGE_20161231, cny$RUNS)
+#Boxplot showing mean age by runaway status
+age.xry.plot <- ggplot(data = cny, aes(x = RUNS, y = AGE_20161231, fill = RUNS))
+age.xry.plot + geom_boxplot(stat = "boxplot") + ggtitle("Average Age Difference by Runaway Status") + xlab("Runaway Status") +  theme(text = element_text(size=12)) +ylab("Age(as of Dec2016)")
+```
+
+2. Is Age at the beginning of spell a significant predictor of runaway?
+```{r}
+spellage.t.test <- t.test(SPELLAGE ~ RUNS, data = cny)
+spellage.t.test
+
+#Boxplot showing mean age by runaway status
+spellage.xry.plot <- ggplot(data = cny, aes(x = RUNS, y = SPELLAGE, fill = RUNS))
+spellage.xry.plot + geom_boxplot(stat = "boxplot") + ggtitle("Average Age at the beginning of Spell by Runaway Status") + xlab("Runaway Status") +
+ylab("Beginning of Spell Age")
+```
+
+3. Is Spell Duration a statistically significant predictor of runaway?
+```{r}
+#t-test to see if spell duration in days is a significant predictor of children who runaway
+spelldays.t.test <- t.test(DURAT ~ RUNS, data = cny)
+spelldays.t.test
+#Boxplot showing mean spell days by runaway status
+spelldays.plot <- ggplot(data = cny, aes(x = RUNS, y = DURAT, fill = RUNS))
+spelldays.plot + geom_boxplot(stat = "boxplot") + ggtitle("Spell Days by Runaway Status") + xlab("Runaway Status") +
+ylab("Spell Duration (in days)")
+
+#t-test to see if spell duration in days is a significant predictor of children who runaway
+spellmonths.t.test <- t.test(DURMO ~ RUNS, data = cny)
+spellmonths.t.test
+#Boxplot showing mean spell months by runaway status
+spellmonths.plot <- ggplot(data = cny, aes(x = RUNS, y = DURMO, fill = RUNS))
+spellmonths.plot + geom_boxplot(stat = "boxplot") + ggtitle("Spell Months by Runaway Status") + xlab("Runaway Status") +
+ylab("Spell Duration (in months)")
+```
+
+**Part 2:**
+I now want to understand the background of children of children who are runaways. To do this, I will create a subset of the dataset to extract the records of XRY cases. 
+
+```{r}
+#Subset of Only Runaway Children
+cny.xry <- filter(cny, EXIT == "Runaway")
+nrow(cny.xry)
+```
+
+
+#Child-specific fields
+Gender: Dependent
+```{r}
+gender.xry_freqtable <- sort(table(cny.xry$GENDER))
+gender.xry_df <- as.data.frame(gender.xry_freqtable)
+colnames(gender.xry_df) <- c("Gender", "Child Count")
+gender.xry_df
+ggplot(data = gender.xry_df, aes(x=`Gender`, y=`Child Count`)) +geom_bar(stat="identity", aes(fill=`Gender`), width= 0.5) + coord_flip() + geom_text(aes(label=`Child Count`), hjust = 8)
+gender.xry <- table(cny$GENDER, cny$RUNS)
+gender.xry
+chisq.test(cny$GENDER, cny$RUNS, correct=FALSE)
+```
+
+Ethnicity: Not Dependent
+```{r}
+ethnicity.xry_freqtable <- sort(table(cny.xry$ETHNIC2))
+ethnicity.xry_df <- as.data.frame(ethnicity.xry_freqtable)
+colnames(ethnicity.xry_df) <- c("Ethnicity", "Child Count")
+ethnicity.xry_df
+ggplot(data = ethnicity.xry_df, aes(x=`Ethnicity`, y=`Child Count`)) +geom_bar(stat="identity", aes(fill=`Ethnicity`), width= 0.5) + coord_flip() + geom_text(aes(label=`Child Count`), hjust = 8)
+
+ethnicity.xry <- table(cny$ETHNIC2, cny$RUNS)
+ethnicity.xry
+chisq.test(cny$ETHNIC2, cny$RUNS, correct=FALSE)
+```
+
+
+Age Category: Dependent
+```{r}
+agecat.xry_freqtable <- sort(table(cny.xry$AGECAT7))
+round(prop.table(agecat.xry_freqtable),2)
+agecat.xry_df <- as.data.frame(agecat.xry_freqtable)
+colnames(agecat.xry_df) <- c("Age Category", "Child Count")
+agecat.xry_df
+ggplot(data = agecat.xry_df, aes(x=`Age Category`, y=`Child Count`)) +geom_bar(stat="identity", aes(fill=`Age Category`), width= 0.5) + coord_flip() + geom_text(aes(label=`Child Count`), hjust = 8)
+agecat.xry <- table(cny$AGECAT7, cny$RUNS)
+agecat.xry
+chisq.test(cny$AGECAT7, cny$RUNS, correct=FALSE)
+```
+
+Hispanic: Dependent
+```{r}
+hispanic.xry_freqtable <- sort(table(cny.xry$HISPANIC))
+hispanic.xry_df <- as.data.frame(hispanic.xry_freqtable)
+colnames(hispanic.xry_df) <- c("Hispanic", "Child Count")
+hispanic.xry_df
+ggplot(data = hispanic.xry_df, aes(x=`Hispanic`, y=`Child Count`)) +geom_bar(stat="identity", aes(fill=`Hispanic`), width= 0.5) + coord_flip() + geom_text(aes(label=`Child Count`), hjust = 8)
+hispanic.xry <- table(cny$HISPANIC, cny$RUNS)
+hispanic.xry
+chisq.test(cny$HISPANIC, cny$RUNS, correct=FALSE)
+```
+
+INYEAR: First year of service: Dependent
+```{r}
+inyear.xry_freqtable <- sort(table(cny.xry$INYEAR))
+inyear.xry_df <- as.data.frame(inyear.xry_freqtable)
+colnames(inyear.xry_df) <- c("In Year", "Child Count")
+inyear.xry_df
+ggplot(data = inyear.xry_df, aes(x=`In Year`, y=`Child Count`)) +geom_bar(stat="identity", aes(fill=`In Year`), width= 0.5) + coord_flip() + geom_text(aes(label=`Child Count`), hjust = 5)
+inyear.xry <- table(cny$INYEAR, cny$RUNS)
+inyear.xry
+chisq.test(cny$INYEAR, cny$RUNS, correct=FALSE)
+```
+
+
+
+#Spell-related fields
+
+OM: Month spell ended : Dependent
+```{r}
+om.xry_freqtable <- sort(table(cny.xry$OM))
+om.xry_df <- as.data.frame(om.xry_freqtable)
+colnames(om.xry_df) <- c("Month Spell Ended", "Child Count")
+om.xry_df
+ggplot(data = om.xry_df, aes(x=`Month Spell Ended`, y=`Child Count`)) +geom_bar(stat="identity", aes(fill=`Child Count`), width= 0.5) + coord_flip() + geom_text(aes(label=`Child Count`), hjust = 8)
+
+om.xry <- table(cny$OM, cny$RUNS)
+om.xry
+chisq.test(cny$OM, cny$RUNS, correct=FALSE)
+```
+
+IM: Month spell began
+```{r}
+im.xry_freqtable <- sort(table(cny.xry$IM))
+im.xry_df <- as.data.frame(im.xry_freqtable)
+colnames(im.xry_df) <- c("Month Spell Began", "Child Count")
+im.xry_df
+ggplot(data = im.xry_df, aes(x=`Month Spell Began`, y=`Child Count`)) +geom_bar(stat="identity", aes(fill=`Child Count`), width= 0.5) + coord_flip() + geom_text(aes(label=`Child Count`), hjust = 8)
+
+im.xry <- table(cny$IM, cny$RUNS)
+im.xry
+chisq.test(cny$IM, cny$RUNS, correct=FALSE)
+```
+
+Primary PLacement Type: Dependent
+```{r}
+type.xry <- table(cny$TYPE, cny$RUNS)
+type.xry
+chisq.test(cny$TYPE, cny$RUNS, correct=FALSE)
+type.tab <- table(cny$RUNS, cny$TYPE)
+type.tab
+```
+
+Last Placement Type: Dependent
+```{r}
+lastplace.xry <- table(cny$LASTPLACE, cny$RUNS)
+lastplace.xry
+chisq.test(cny$LASTPLACE, cny$RUNS, correct=FALSE)
+lastplace.tab <- table(cny$RUNS, cny$LASTPLACE)
+lastplace.tab
+```
+
+
+Reenter: Dependent
+```{r}
+lastplace.xry <- table(cny$LASTPLACE, cny$RUNS)
+lastplace.xry
+chisq.test(cny$LASTPLACE, cny$RUNS, correct=FALSE)
+lastplace.tab <- table(cny$RUNS, cny$LASTPLACE)
+lastplace.tab
+```
+
+
+Regression and Random Forest
+```{r}
+cny.new <- cny
+cny.new$ID <- NULL
+cny.new$ST_CNTYNAME <- NULL
+cny.new$START <- NULL
+cny.new$STOP <- NULL
+cny.new$PLACE2_DATE <- NULL
+cny.new$RECAT <- NULL
+cny.new$IYMO <- NULL
+cny.new$OYMO <- NULL
+cny.new$DURAT <- NULL
+cny.new$DURMO <- NULL
+cny.new$SPELL <- NULL
+cny.new$PLACE2 <- NULL
+cny.new$EXIT <- NULL
+```
+
+
+```{r}
+cny.new<- transform(cny.new,
+                RUNS = as.factor(mapvalues(RUNS,c(1,0),c("Runaway","Not Runaway"))),
+                AGE_20161231 = as.factor(AGE_20161231),
+                SPELLAGE = as.factor(SPELLAGE),
+                SPELLONE = as.factor(mapvalues(SPELLONE,c(1,0),c("First Spell","Not First Spell"))),
+                INYEAR = as.factor(mapvalues(INYEAR, c(2014,2015,2016),c("2014","2015","2016"))),  
+                LEVELCHG = as.factor(mapvalues(LEVELCHG, c(0,1),c("0","1"))),
+                DISCH = as.factor(mapvalues(DISCH, c(0,1),c("0","1"))),
+                REENTER = as.factor(mapvalues(REENTER, c(0,1),c("0","1"))),
+                NPLACES = as.factor(mapvalues(NPLACES, c(1,2,3,4,5,6,7,8,9,11,13),c("1","2","3","4","5","6","7","8","9","11","13"))),
+                MOVES = as.factor(mapvalues(MOVES, c(0,1,2,3,4,5,6,7,8,10,12),c("0","1","2","3","4","5","6","7","8","10","12"))),
+                AGECAT7 = as.factor(mapvalues(AGECAT7, c(1,2,3,4,5,6,7), c("0 years","1-2 years","3-5 years", "6-8 years","9-11 years","12-14 years","15-17 years"))),
+                DURCAT = as.factor(mapvalues(DURCAT, c(1,2,3,4,5,6), c("1-29 days","30-89 days","90-179 days", "180-364 days","365-544 days","545-1094 days"))), 
+                TYPE = as.factor(mapvalues(TYPE, c("AL","FC","GH","IL","KC","RC", "RT","SF","SG","UK"), c("Alternative Placement","Foster Care","Group Home", "Independent Living","Kinship Care","Residential Care","Residential Treatment Facilities","Shelter Foster Care","Shelter Group Home","Unknown"))),
+                IM = as.factor(mapvalues(IM, c(1,2,3,4,5,6,7,8,9,10,11,12),c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"))),
+                IY = as.factor(mapvalues(IY,c(2014,2015,2016),c("2014","2015","2016"))),
+                OM = as.factor(mapvalues(OM, c(1,2,3,4,5,6,7,8,9,10,11,12),c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"))),
+                OY = as.factor(mapvalues(OY,c(2014,2015,2016,2017),c("2014","2015","2016","2017"))))
+```
+
+```{r}
+ncol(cny.new)
+str(cny.new)
+```
+
+
+```{r}
+random.forest.output<- randomForest(RUNS ~ ., data = cny.new, na.action = na.omit)
+random.forest.output
+```
+
+
+```{r}
+vi_f = importance(random.forest.output)
+vi_f
+varImpPlot(random.forest.output,type=2)
+```
+```{r}
+x <- glm(RUNS ~ OM + TYPE + REENTER + DURCAT + ETHNIC2 + GENDER, binomial,data =cny.new)
+summary(x)
+```
+
+
+```{r}
+cny.kc <- filter(cny,TYPE=="Kinship Care")
+cny.fc <- filter(cny,TYPE=="Foster Care")
+cny.sg <- filter(cny,TYPE=="Shelter Group Home")
+cny.il <- filter(cny, TYPE == "Independent Living")
+```
+
+```{r}
+cny.jan <- filter(cny, OM == "Jan", AGECAT7 == "12-14 years" | AGECAT7 == "15-17 years" |AGECAT7 == "18-23 years", RUNS=="Runaway")
+cny.feb <- filter(cny, OM == "Feb", AGECAT7 == "12-14 years" | AGECAT7 == "15-17 years" |AGECAT7 == "18-23 years" ,RUNS=="Runaway")
+cny.mar <- filter(cny, OM == "Mar", AGECAT7 == "12-14 years" | AGECAT7 == "15-17 years" |AGECAT7 == "18-23 years", RUNS=="Runaway")
+cny.apr <- filter(cny, OM == "Apr", AGECAT7 == "12-14 years" | AGECAT7 == "15-17 years" |AGECAT7 == "18-23 years",RUNS=="Runaway")
+cny.may<- filter(cny, OM == "May", AGECAT7 == "12-14 years" | AGECAT7 == "15-17 years" |AGECAT7 == "18-23 years", RUNS=="Runaway")
+cny.jun <- filter(cny, OM == "Jun", AGECAT7 == "12-14 years" | AGECAT7 == "15-17 years" |AGECAT7 == "18-23 years", RUNS=="Runaway")
+cny.jul <- filter(cny, OM == "Jul", AGECAT7 == "12-14 years" | AGECAT7 == "15-17 years" |AGECAT7 == "18-23 years", RUNS=="Runaway")
+cny.aug <- filter(cny, OM == "Aug", AGECAT7 == "12-14 years" | AGECAT7 == "15-17 years" |AGECAT7 == "18-23 years", RUNS=="Runaway")
+cny.sep <- filter(cny, OM == "Sep", AGECAT7 == "12-14 years" | AGECAT7 == "15-17 years" |AGECAT7 == "18-23 years", RUNS=="Runaway")
+cny.oct<- filter(cny, OM == "Oct", AGECAT7 == "12-14 years" | AGECAT7 == "15-17 years" |AGECAT7 == "18-23 years", RUNS=="Runaway")
+cny.nov <- filter(cny, OM == "Nov", AGECAT7 == "12-14 years" | AGECAT7 == "15-17 years" |AGECAT7 == "18-23 years", RUNS=="Runaway")
+cny.dec <- filter(cny, OM == "Dec", AGECAT7 == "12-14 years" | AGECAT7 == "15-17 years" |AGECAT7 == "18-23 years",RUNS=="Runaway")
+```
+
+```{r}
+nrow(cny.jan)
+nrow(cny.feb)
+nrow(cny.mar)
+nrow(cny.apr)
+nrow(cny.may)
+nrow(cny.jun)
+nrow(cny.jul)
+nrow(cny.aug)
+nrow(cny.sep)
+nrow(cny.oct)
+nrow(cny.nov)
+nrow(cny.dec)
+```
+
+
