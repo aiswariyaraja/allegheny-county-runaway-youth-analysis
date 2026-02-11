@@ -1,0 +1,1 @@
+This is an exploratory analysis of the demographic characterestics of youth who ran away from placement centers in Allegheny County between from 2014-2016. This repository consists of the dataset, analysis code, and a final report with key takeaways. 
